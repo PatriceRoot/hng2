@@ -8,10 +8,6 @@
     "start": "nodemon index.js",
     "test": "jest"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "transform": {}
-  },
   "author": "",
   "license": "ISC",
   "dependencies": {
