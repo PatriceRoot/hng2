@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import User from '../models/user.model.js';
-import Organisation from '../models/organisation.model.js';
+import User from '../Models/user.model.js';
+import Organisation from '../Models/organisation.model.js';
 
 dotenv.config();
 

@@ -1,99 +1,51 @@
-import { PrismaClient } from '@prisma/client';
+import Organisation from '../Models/organisation.model.js';
 
-const prisma = new PrismaClient();
-
-export const getOrganisations = async (req, res) => {
-  const userId = req.user.userId;
+export const getAllOrganisations = async (req, res) => {
+  const userId = req.user.id;
 
   try {
-    const organisations = await prisma.organisation.findMany({
-      where: {
-        users: {
-          some: {
-            userId
-          }
-        }
-      }
+    const organisations = await Organisation.findMany({
+      where: { users: { some: { id: userId } } },
     });
 
     res.status(200).json({
       status: 'success',
-      message: 'Organisations retrieved successfully',
-      data: { organisations }
+      message: 'Organisations fetched successfully',
+      data: { organisations },
     });
   } catch (error) {
-    res.status(500).json({ status: 'Internal Server Error', message: 'An error occurred', statusCode: 500 });
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error',
+    });
   }
 };
 
 export const getOrganisationById = async (req, res) => {
   const { orgId } = req.params;
-  const userId = req.user.userId;
+  const userId = req.user.id;
 
   try {
-    const organisation = await prisma.organisation.findUnique({
-      where: { orgId },
-      include: {
-        users: true
-      }
+    const organisation = await Organisation.findFirst({
+      where: { id: parseInt(orgId, 10), users: { some: { id: userId } } },
     });
 
-    if (!organisation || !organisation.users.some(user => user.userId === userId)) {
-      return res.status(403).json({ status: 'Forbidden', message: 'Access denied', statusCode: 403 });
+    if (!organisation) {
+      return res.status(404).json({
+        status: 'Not found',
+        message: 'Organisation not found',
+      });
     }
 
     res.status(200).json({
       status: 'success',
-      message: 'Organisation retrieved successfully',
-      data: organisation
+      message: 'Organisation fetched successfully',
+      data: { organisation },
     });
   } catch (error) {
-    res.status(500).json({ status: 'Internal Server Error', message: 'An error occurred', statusCode: 500 });
-  }
-};
-
-export const createOrganisation = async (req, res) => {
-  const { name, description } = req.body;
-  const userId = req.user.userId;
-
-  try {
-    const organisation = await prisma.organisation.create({
-      data: {
-        name,
-        description,
-        users: {
-          create: { userId }
-        }
-      }
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal Server Error',
     });
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Organisation created successfully',
-      data: organisation
-    });
-  } catch (error) {
-    res.status(400).json({ status: 'Bad Request', message: 'Client error', statusCode: 400 });
-  }
-};
-
-export const addUserToOrganisation = async (req, res) => {
-  const { orgId } = req.params;
-  const { userId } = req.body;
-
-  try {
-    await prisma.organisationUser.create({
-      data: {
-        userId,
-        orgId
-      }
-    });
-
-    res.status(200).json({
-      status: 'success',
-      message: 'User added to organisation successfully'
-    });
-  } catch (error) {
-    res.status(400).json({ status: 'Bad Request', message: 'Client error', statusCode: 400 });
   }
 };
