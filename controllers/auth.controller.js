@@ -1,98 +1,127 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-import { validationResult } from 'express-validator';
+import dotenv from 'dotenv';
+import User from '../Models/user.model.js';
+import Organisation from '../Models/organisation.model.js';
 
-const prisma = new PrismaClient();
+dotenv.config();
 
-export const registerUser = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array() });
+export const register = async (req, res) => {
+  const { firstName, lastName, email, password, phone } = req.body;
+
+  if (!firstName || !lastName || !email || !password) {
+    return res.status(422).json({
+      errors: [
+        { field: 'firstName', message: 'First name is required' },
+        { field: 'lastName', message: 'Last name is required' },
+        { field: 'email', message: 'Email is required' },
+        { field: 'password', message: 'Password is required' }
+      ]
+    });
   }
 
-  const { firstName, lastName, email, password, phone } = req.body;
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await User.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(422).json({
+        errors: [{ field: 'email', message: 'Email is already taken' }]
+      });
+    }
 
-    const user = await prisma.user.create({
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({
       data: {
         firstName,
         lastName,
         email,
         password: hashedPassword,
-        phone,
-        organisations: {
-          create: {
-            organisation: {
-              create: {
-                name: `${firstName}'s Organisation`
-              }
-            }
-          }
-        }
-      },
-      include: {
-        organisations: {
-          include: {
-            organisation: true
-          }
+        phone
+      }
+    });
+
+    const organisationName = `${firstName}'s Organisation`;
+    await Organisation.create({
+      data: {
+        name: organisationName,
+        description: `Organisation for ${firstName}`,
+        users: {
+          connect: { id: newUser.id }
         }
       }
     });
 
-    const accessToken = jwt.sign({ userId: user.userId, email: user.email }, 'your_jwt_secret', { expiresIn: '1h' });
+    const token = jwt.sign({ id: newUser.id, email: newUser.email }, process.env.JWT_SECRET, {
+      expiresIn: '1h'
+    });
 
     res.status(201).json({
       status: 'success',
       message: 'Registration successful',
       data: {
-        accessToken,
+        accessToken: token,
         user: {
-          userId: user.userId,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          phone: user.phone,
+          userId: newUser.id,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email,
+          phone: newUser.phone
         }
       }
     });
   } catch (error) {
-    res.status(400).json({ status: 'Bad request', message: 'Registration unsuccessful', statusCode: 400 });
+    res.status(400).json({
+      status: 'Bad request',
+      message: 'Registration unsuccessful',
+      statusCode: 400
+    });
   }
 };
 
-export const loginUser = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array() });
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(422).json({
+      errors: [
+        { field: 'email', message: 'Email is required' },
+        { field: 'password', message: 'Password is required' }
+      ]
+    });
   }
 
-  const { email, password } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
-
+    const user = await User.findUnique({ where: { email } });
     if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ status: 'Bad request', message: 'Authentication failed', statusCode: 401 });
+      return res.status(401).json({
+        status: 'Bad request',
+        message: 'Authentication failed',
+        statusCode: 401
+      });
     }
 
-    const accessToken = jwt.sign({ userId: user.userId, email: user.email }, 'your_jwt_secret', { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, {
+      expiresIn: '1h'
+    });
 
     res.status(200).json({
       status: 'success',
       message: 'Login successful',
       data: {
-        accessToken,
+        accessToken: token,
         user: {
-          userId: user.userId,
+          userId: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
-          phone: user.phone,
+          phone: user.phone
         }
       }
     });
   } catch (error) {
-    res.status(400).json({ status: 'Bad request', message: 'Authentication failed', statusCode: 401 });
+    res.status(400).json({
+      status: 'Bad request',
+      message: 'Authentication failed',
+      statusCode: 401
+    });
   }
 };
