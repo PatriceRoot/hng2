@@ -1,9 +1,9 @@
 import express from 'express';
 import { getUserById } from '../controllers/user.controller.js';
-import { authenticateToken } from '../middleware/auth.js';
+import auth from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/users/:id', authenticateToken, getUserById);
+router.get('/:id', auth, getUserById);
 
 export default router;
